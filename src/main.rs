@@ -1,5 +1,9 @@
-#![doc(html_root_url = "https://docs.rs/wgpu-app-sample/0.17.1")]
+#![doc(html_root_url = "https://docs.rs/wgpu-app-sample/0.17.2")]
 //! Rust sample for wgpu-app management Vertex Texture CameraAngle
+//!
+//! partial fork (remove wasm32) from
+//!
+//! https://github.com/gfx-rs/wgpu/tree/v0.17/examples/cube
 //!
 
 use std::{borrow::Cow, future::Future, mem, pin::Pin, task};
@@ -78,7 +82,7 @@ impl app::App for App {
             ty: wgpu::BindingType::Buffer{
               ty: wgpu::BufferBindingType::Uniform,
               has_dynamic_offset: false,
-              min_binding_size: wgpu::BufferSize::new(64)
+              min_binding_size: wgpu::BufferSize::new(64) // mat4x4<f32>
             },
             count: None
           },
@@ -91,6 +95,16 @@ impl app::App for App {
               view_dimension: wgpu::TextureViewDimension::D2
             },
             count: None
+          },
+          wgpu::BindGroupLayoutEntry{
+            binding: 2,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Buffer{
+              ty: wgpu::BufferBindingType::Uniform,
+              has_dynamic_offset: false,
+              min_binding_size: wgpu::BufferSize::new(8) // vec2<u32>
+            },
+            count: None
           }
         ]
       });
@@ -101,7 +115,7 @@ impl app::App for App {
         push_constant_ranges: &[]
       });
 
-    // Create other resources
+    // Create buffer resources (as transform mat4x4<f32> on bind_group: 0)
     let mvp = vt::CameraAngle::new(
       glam::Vec3::new(1.5f32, -5.0, 3.0),
       glam::Vec3::ZERO,
@@ -167,19 +181,34 @@ impl app::App for App {
         },
         texture_extent
       );
-      device.create_bind_group(&wgpu::BindGroupDescriptor{
-        layout: &bind_group_layout,
-        entries: &[
-          wgpu::BindGroupEntry{
-            binding: 0,
-            resource: uniform_buf.as_entire_binding()
-          },
-          wgpu::BindGroupEntry{
-            binding: 1,
-            resource: wgpu::BindingResource::TextureView(&texture_view)
-          }
-        ],
-        label: None})
+      // Create buffer resources (as tex_sz vec2<u32> on bind_group: 2)
+      let tex_sz: Vec<u32> = vec![hwd.1, hwd.0]; // must have len 2
+      let tex_sz_buf = device.create_buffer_init(
+        &wgpu::util::BufferInitDescriptor{
+          label: Some("Texture Size Buffer"),
+          contents: bytemuck::cast_slice(tex_sz.as_ref()), // &[u32; 2]
+          usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST
+        });
+      vt::TextureBindGroup{
+        group: device.create_bind_group(&wgpu::BindGroupDescriptor{
+          layout: &bind_group_layout,
+          entries: &[
+            wgpu::BindGroupEntry{
+              binding: 0,
+              resource: uniform_buf.as_entire_binding()
+            },
+            wgpu::BindGroupEntry{
+              binding: 1,
+              resource: wgpu::BindingResource::TextureView(&texture_view)
+            },
+            wgpu::BindGroupEntry{
+              binding: 2,
+              resource: tex_sz_buf.as_entire_binding() // tex_sz(x, y) = (w, h)
+            }
+          ],
+          label: None}),
+        sz: tex_sz,
+        buf: tex_sz_buf}
     }).collect();
 
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor{
@@ -223,6 +252,11 @@ impl app::App for App {
           front_face: wgpu::FrontFace::Ccw, // (from wire)
           cull_mode: Some(wgpu::Face::Back), // None Some(...::Back/Front)
           polygon_mode: wgpu::PolygonMode::Fill, // Fill Line Point (from wire)
+          // https://sotrh.github.io/learn-wgpu/beginner/tutorial3-pipeline/
+          // topology: wgpu::PrimitiveTopology::TriangleList,
+          // strip_index_format: None,
+          unclipped_depth: true, // Requires Features::DEPTH_CLIP_CONTROL
+          conservative: false, // Requires Features::CONSERVATIVE_RASTERIZATION
           ..Default::default()
         },
         depth_stencil: None,
@@ -313,6 +347,8 @@ impl app::App for App {
           log::info!(" {:?}", vk); // JIS 106 key '+' mapped as '='
           match (state, vk) {
           (event::ElementState::Released, _) => {},
+          (_, event::VirtualKeyCode::Key0 | event::VirtualKeyCode::Numpad0) =>
+            self.yrp = vt::YRP{yaw: -90.0, roll: 0.0, pitch: 0.0, tick: 0},
           (_, event::VirtualKeyCode::Left) => self.yrp.yaw -= 6.0,
           (_, event::VirtualKeyCode::Right) => self.yrp.yaw += 6.0,
           (_, event::VirtualKeyCode::LControl) => self.yrp.roll -= 6.0,

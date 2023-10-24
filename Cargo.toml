@@ -1,6 +1,6 @@
 [package]
 name = "wgpu-app-sample"
-version = "0.17.1" # change with html_root_url in main.rs
+version = "0.17.2" # change with html_root_url in main.rs
 edition = "2021"
 authors = ["nomissbowling <nomissbowling@yahoo.co.jp>"]
 
@@ -18,7 +18,7 @@ readme = "README.md"
 #build = "build.rs"
 
 [dependencies]
-wgpu-app = { version = "0.17" } # "0.17.1"
+wgpu-app = { version = "0.17" } # "0.17.2"
 
 wgpu = { version = "0.17" } # "0.17.1"
 winit = { version = "0.28" } # "0.28.7"
