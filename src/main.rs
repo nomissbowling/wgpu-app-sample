@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/wgpu-app-sample/0.17.2")]
+#![doc(html_root_url = "https://docs.rs/wgpu-app-sample/0.17.3")]
 //! Rust sample for wgpu-app management Vertex Texture CameraAngle
 //!
 //! partial fork (remove wasm32) from
@@ -56,7 +56,7 @@ impl app::App for App {
     let vips = [
       vt::create_vertices_cube_6_textures(|(i, bg, m)| (i + bg) % m),
       vt::locscale(&[0.0, -2.0, 0.0], 0.5,
-        vt::create_vertices_cube_expansion_plan(|_| 2)),
+        vt::create_vertices_cube_expansion_plan(|_| 4)),
       vt::locscale(&[2.0, 0.0, 0.0], 0.5,
         vt::create_vertices_cube_6_textures(|(i, _, _)| i))
     ].into_iter().map(|(vertex_data, index_data, fi)| {vt::VIP{
@@ -102,7 +102,7 @@ impl app::App for App {
             ty: wgpu::BindingType::Buffer{
               ty: wgpu::BufferBindingType::Uniform,
               has_dynamic_offset: false,
-              min_binding_size: wgpu::BufferSize::new(8) // vec2<u32>
+              min_binding_size: wgpu::BufferSize::new(16) // 2 x vec2<u32>
             },
             count: None
           }
@@ -143,6 +143,8 @@ impl app::App for App {
     let mut texels_list = vec![ // textures
       vt::load_texels("res/tex_RGBY_4x4_24_bpr12.png").unwrap(), // to 4 16
       vt::load_texels("res/tex_RGBY_2x2_24_bpr6.png").unwrap(), // to 4 8
+      vt::load_texels("res/tex_RGBY_256x192_landscape.png").unwrap(), // 4 1024
+      vt::load_texels("res/tex_RGBY_192x256_portrait.png").unwrap(), // 4 768
       vt::load_texels("res/tex_cube_256x256.png").unwrap(), // 4 1024 bpr
       vt::create_texels_rgba(256, &cols4u)];
     for c4f in cols4f {
@@ -181,12 +183,12 @@ impl app::App for App {
         },
         texture_extent
       );
-      // Create buffer resources (as tex_sz vec2<u32> on bind_group: 2)
-      let tex_sz: Vec<u32> = vec![hwd.1, hwd.0]; // must have len 2
+      // Create buffer resources (as TexSZ on bind_group: 2)
+      let tex_sz = vt::TexSZ{w: hwd.1, h: hwd.0, ext: [0, 256]};
       let tex_sz_buf = device.create_buffer_init(
         &wgpu::util::BufferInitDescriptor{
           label: Some("Texture Size Buffer"),
-          contents: bytemuck::cast_slice(tex_sz.as_ref()), // &[u32; 2]
+          contents: bytemuck::cast_slice(tex_sz.as_ref()), // &[u32; 4]
           usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST
         });
       vt::TextureBindGroup{
@@ -203,7 +205,7 @@ impl app::App for App {
             },
             wgpu::BindGroupEntry{
               binding: 2,
-              resource: tex_sz_buf.as_entire_binding() // tex_sz(x, y) = (w, h)
+              resource: tex_sz_buf.as_entire_binding() // tex_sz.[w|h|ext]
             }
           ],
           label: None}),
@@ -222,14 +224,24 @@ impl app::App for App {
       step_mode: wgpu::VertexStepMode::Vertex,
       attributes: &[
         wgpu::VertexAttribute{
-          format: wgpu::VertexFormat::Float32x4,
+          format: wgpu::VertexFormat::Float32x4, // pos
           offset: 0,
           shader_location: 0
         },
         wgpu::VertexAttribute{
-          format: wgpu::VertexFormat::Float32x2,
+          format: wgpu::VertexFormat::Float32x4, // norm
           offset: 4 * 4,
           shader_location: 1
+        },
+        wgpu::VertexAttribute{
+          format: wgpu::VertexFormat::Uint32x4, // col
+          offset: 4 * (4 + 4),
+          shader_location: 2
+        },
+        wgpu::VertexAttribute{
+          format: wgpu::VertexFormat::Float32x2, // tex_coord
+          offset: 4 * (4 + 4 + 4),
+          shader_location: 3
         }
       ]
     }];
