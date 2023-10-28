@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/wgpu-app-sample/0.17.3")]
+#![doc(html_root_url = "https://docs.rs/wgpu-app-sample/0.17.4")]
 //! Rust sample for wgpu-app management Vertex Texture CameraAngle
 //!
 //! partial fork (remove wasm32) from
@@ -54,7 +54,8 @@ impl app::App for App {
     // Create the vertex and index buffers
     let vertex_size = mem::size_of::<vt::Vertex>();
     let vips = [
-      vt::create_vertices_cube_6_textures(|(i, bg, m)| (i + bg) % m),
+      vt::locscale(&[0.0, 0.0, 0.0], 1.0,
+        vt::create_vertices_cube_6_textures(|(i, bg, m)| (i + bg) % m)),
       vt::locscale(&[0.0, -2.0, 0.0], 0.5,
         vt::create_vertices_cube_expansion_plan(|_| 4)),
       vt::locscale(&[2.0, 0.0, 0.0], 0.5,
@@ -222,28 +223,12 @@ impl app::App for App {
     let vertex_buffers = [wgpu::VertexBufferLayout{
       array_stride: vertex_size as wgpu::BufferAddress,
       step_mode: wgpu::VertexStepMode::Vertex,
-      attributes: &[
-        wgpu::VertexAttribute{
-          format: wgpu::VertexFormat::Float32x4, // pos
-          offset: 0,
-          shader_location: 0
-        },
-        wgpu::VertexAttribute{
-          format: wgpu::VertexFormat::Float32x4, // norm
-          offset: 4 * 4,
-          shader_location: 1
-        },
-        wgpu::VertexAttribute{
-          format: wgpu::VertexFormat::Uint32x4, // col
-          offset: 4 * (4 + 4),
-          shader_location: 2
-        },
-        wgpu::VertexAttribute{
-          format: wgpu::VertexFormat::Float32x2, // tex_coord
-          offset: 4 * (4 + 4 + 4),
-          shader_location: 3
-        }
-      ]
+      attributes: &wgpu::vertex_attr_array![
+        0 => Float32x4, // pos
+        1 => Float32x4, // norm
+        2 => Uint32x4, // col
+        3 => Float32x2, // tex_coord
+        4 => Uint32] // ix
     }];
 
     let pipeline = device.create_render_pipeline(

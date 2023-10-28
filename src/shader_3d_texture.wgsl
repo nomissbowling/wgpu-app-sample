@@ -1,8 +1,11 @@
+// https://www.w3.org/TR/WGSL/#builtin-inputs-outputs
+
 struct VertexOutput {
   @builtin(position) position: vec4<f32>,
   @location(0) norm: vec4<f32>,
   @location(1) col: vec4<u32>,
   @location(2) tex_coord: vec2<f32>,
+  @location(3) ix: u32, // not builtin(vertex_index)
 };
 
 @group(0) @binding(0) var<uniform> transform: mat4x4<f32>;
@@ -13,12 +16,14 @@ fn vs_main(
   @location(1) norm: vec4<f32>, // normal
   @location(2) col: vec4<u32>, // vertexcol
   @location(3) tex_coord: vec2<f32>,
+  @builtin(vertex_index) ix: u32,
 ) -> VertexOutput {
   var result: VertexOutput;
   result.position = transform * position;
   result.norm = norm;
   result.col = col;
   result.tex_coord = tex_coord;
+  result.ix = ix;
   return result;
 }
 
